@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 
 type Cliente = {
   id: number;
@@ -10,12 +10,65 @@ type Cliente = {
   email: string;
 };
 
+function normalizarCpf(valor: string): string {
+  return valor.replace(/\D/g, ""); // remove tudo que não é dígito
+}
+
 export default function Home() {
   const [clientes, setClientes] = useState<Cliente[]>([]);
+  const [carregado, setCarregado] = useState(false);
+  const [busca, setBusca] = useState("");
   const [nome, setNome] = useState("");
   const [cpf, setCpf] = useState("");
   const [telefone, setTelefone] = useState("");
   const [email, setEmail] = useState("");
+
+  useEffect(() => {
+    const clientesSalvos = localStorage.getItem("hem-clientes");
+
+    if (clientesSalvos) {
+      setClientes(JSON.parse(clientesSalvos));
+    }
+
+    setCarregado(true);
+  }, []);
+
+  useEffect(() => {
+    if (!carregado) {
+      return;
+    }
+
+    localStorage.setItem("hem-clientes", JSON.stringify(clientes));
+  }, [clientes, carregado]);
+
+  const clientesFiltrados = clientes.filter((cliente) => {
+    const textoBusca = busca.toLowerCase().trim();
+
+    if (!textoBusca) {
+      return true;
+    }
+
+    if (cliente.nome.toLowerCase().includes(textoBusca)) {
+      return true;
+    }
+
+    if (cliente.telefone.toLowerCase().includes(textoBusca)) {
+      return true;
+    }
+
+    if (cliente.email.toLowerCase().includes(textoBusca)) {
+      return true;
+    }
+
+    const cpfNumerico = normalizarCpf(cliente.cpf);
+    const buscaNumerica = normalizarCpf(textoBusca);
+
+    if (buscaNumerica && cpfNumerico.includes(buscaNumerica)) {
+      return true;
+    }
+
+    return false;
+  });
 
   function cadastrarCliente(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -170,41 +223,32 @@ export default function Home() {
                 </h2>
 
                 <p className="mt-1 text-sm text-slate-500">
-                  {clientes.length}{" "}
-                  {clientes.length === 1
-                    ? "cliente cadastrado"
-                    : "clientes cadastrados"}
+                  {clientesFiltrados.length}{" "}
+                  {clientesFiltrados.length === 1
+                    ? "cliente encontrado"
+                    : "clientes encontrados"}
                 </p>
               </div>
 
               <input
                 type="search"
-                placeholder="Pesquisar cliente"
+                value={busca}
+                onChange={(event) => setBusca(event.target.value)}
+                placeholder="Pesquisar por nome, CPF, telefone ou e-mail"
                 className="rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
-                onChange={(event) => {
-                  const busca = event.target.value.toLowerCase();
-
-                  setClientes((clientesAtuais) => {
-                    if (!busca) {
-                      return clientesAtuais;
-                    }
-
-                    return clientesAtuais.filter((cliente) =>
-                      cliente.nome.toLowerCase().includes(busca)
-                    );
-                  });
-                }}
               />
             </div>
 
-            {clientes.length === 0 ? (
+            {clientesFiltrados.length === 0 ? (
               <div className="mt-8 rounded-xl border border-dashed border-slate-300 p-8 text-center">
                 <p className="font-medium text-slate-700">
-                  Nenhum cliente cadastrado
+                  Nenhum cliente encontrado
                 </p>
 
                 <p className="mt-1 text-sm text-slate-500">
-                  Use o formulário ao lado para adicionar o primeiro cliente.
+                  {clientes.length === 0
+                    ? "Use o formulário ao lado para adicionar o primeiro cliente."
+                    : "Tente pesquisar com outro termo."}
                 </p>
               </div>
             ) : (
@@ -223,7 +267,7 @@ export default function Home() {
                   </thead>
 
                   <tbody>
-                    {clientes.map((cliente) => (
+                    {clientesFiltrados.map((cliente) => (
                       <tr
                         key={cliente.id}
                         className="border-b border-slate-100 last:border-0"
